@@ -6,7 +6,7 @@ $osUri = "https://rhcos.blob.core.windows.net/imagebucket/rhcos-413.92.202305021
 
 
 $diskName = "jcallen-temp-disk"
-#$storageAccount = New-AzStorageAccount -ResourceGroupName $resourceGroupName -Name $storageAccountName -SkuName "Standard_LRS" -Location $location 
+#$storageAccount = New-AzStorageAccount -ResourceGroupName $resourceGroupName -Name $storageAccountName -SkuName "Standard_LRS" -Location $location
 
 #New-AzStorageContainer -Name $storageContainerName -Context $storageAccount.Context -Permission Blob
 

@@ -7,7 +7,7 @@
 
 $osUri = "https://rhcos.blob.core.windows.net/imagebucket/rhcos-413.92.202305021736-0-azure.x86_64.vhd"
 
-$storageAccount = New-AzStorageAccount -ResourceGroupName $resourceGroupName -Name $storageAccountName -SkuName "Standard_LRS" -Location $location 
+$storageAccount = New-AzStorageAccount -ResourceGroupName $resourceGroupName -Name $storageAccountName -SkuName "Standard_LRS" -Location $location
 
 New-AzStorageContainer -Name $storageContainerName -Context $storageAccount.Context -Permission Blob
 
@@ -20,40 +20,58 @@ $blob = Get-AzStorageBlob -Blob "rhcos.vhd" -Container $storageContainerName -Co
 
 $blobUri = $blob.BlobClient.Uri
 
-$imageConfig = New-AzImageConfig -Location $location 
+$imageConfig = New-AzImageConfig -Location $location -HyperVGeneration V2
 
 $managedDisk = Set-AzImageOsDisk -Image $imageConfig -OsType 'Linux' -OsState 'Generalized' -BlobUri $blobUri
 
-#$imageName = "rhcos"
+$imageName = "rhcos"
 
-#New-AzImage -Image $imageConfig -ImageName $imageName -ResourceGroupName $resourceGroupName 
+# copy seems racy...
+Start-Sleep -Seconds 30
+
+$image = New-AzImage -Image $imageConfig -ImageName $imageName -ResourceGroupName $resourceGroupName
 
 
-$galleryImage = New-AzGalleryImage `
-    -ResourceGroupName $resourceGroupName `
-    -GalleryName $galleryName `
-    -GalleryImageDefinitionName $galleryImageDefinitionName `
-    -Name $imageVersion `
-    -OsState generalized `
-    -OsType Linux `
-    -DataDiskReferences @(New-AzGalleryDataDiskReference -Lun 0 -ManagedDiskId $managedDisk.Id)
+$managedDisk
+$image
 
-# Create a new shared image gallery
+
+$osDisk = @{Source = @{Id = $image.Id}}
+
 $gallery = New-AzGallery `
+    -GalleryName 'myGallery' `
     -ResourceGroupName $resourceGroupName `
-    -GalleryName $galleryName `
     -Location $location `
-    -Description "Shared Image Gallery"
+    -Description 'Azure Compute Gallery for my organization'
 
-# Publish the image to the shared image gallery
-Publish-AzGalleryImageVersion `
+
+# Why is hyperVGeneration set to V1?
+
+$imageDefinition = New-AzGalleryImageDefinition `
+    -GalleryName $gallery.Name `
     -ResourceGroupName $resourceGroupName `
-    -GalleryName $galleryName `
-    -GalleryImageDefinitionName $imageDefinitionName `
-    -Version $imageVersion `
-    -ImageId $galleryImage.Id
+    -Location $location `
+    -Name 'rhcos' `
+    -OsState 'Generalized'`
+    -OsType 'Linux'`
+    -Publisher 'RedHat' `
+    -Offer 'rhcos' `
+    -Sku 'basic' `
+    -HyperVGeneration V2
 
+#$imageVersion = New-AzGalleryImageVersion `
+#    -GalleryImageDefinitionName $imageDefinition.Name`
+#    -GalleryImageVersionName '1.0.0' `
+#    -GalleryName $gallery.Name `
+#    -ResourceGroupName $resourceGroupName `
+#    -Location $location `
+#    -OSDiskImage $osDisk
 
-$gallery
-$galleryImage
+$imageVersion = New-AzGalleryImageVersion `
+    -GalleryImageDefinitionName $imageDefinition.Name`
+    -GalleryImageVersionName '1.0.0' `
+    -GalleryName $gallery.Name `
+    -ResourceGroupName $resourceGroupName `
+    -Location $location `
+    -SourceImageId $image.Id
 
